@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+<title>VMG — Velocity Made Good</title>
+<meta name="description" content="Live velocity made good, distance and bearing to a waypoint using your phone's GPS." />
+
+<!-- PWA -->
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#06121A" />
+
+<!-- iOS install support -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="VMG" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+
+<style>
+  :root{
+    --bg:#06121A;
+    --panel:#0E2230;
+    --panel-2:#0B1B26;
+    --line:#1C3A4A;
+    --text:#DCEBF0;
+    --muted:#6F93A3;
+    --good:#3FE0B0;      /* closing  */
+    --bad:#FF6B5B;       /* opening  */
+    --mark:#F2B33D;      /* waypoint needle */
+    --cog:#5AA9D6;       /* course over ground */
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Roboto Mono", monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; }
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #0c2434 0%, var(--bg) 55%) fixed,
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+    display:flex; flex-direction:column;
+    min-height:100dvh;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex; align-items:center; gap:10px;
+    padding:12px 16px 10px;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{ font-weight:700; letter-spacing:.14em; font-size:13px; color:var(--muted); }
+  .brand b{ color:var(--text); }
+  .active-wp{
+    flex:1; min-width:0;
+    font-size:15px; color:var(--mark);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;
+  }
+  .units-btn{
+    font-family:var(--mono); font-size:15px; color:var(--text);
+    background:var(--panel); border:1px solid var(--line); border-radius:8px;
+    padding:7px 12px;
+  }
+
+  main{ flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+  .view{ display:none; padding:14px 16px 20px; }
+  .view.active{ display:block; }
+
+  /* ---------- Navigate view ---------- */
+  .dial-wrap{ display:flex; justify-content:center; margin:6px 0 2px; }
+  .dial{ width:min(78vw, 320px); aspect-ratio:1; position:relative; }
+  .dial svg{ width:100%; height:100%; display:block; }
+  .core{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; pointer-events:none;
+  }
+  .vmg-num{
+    font-family:var(--mono); font-weight:600;
+    font-size:clamp(56px, 22vw, 108px); line-height:.92;
+    font-variant-numeric:tabular-nums; letter-spacing:-.02em;
+    color:var(--good);
+    text-shadow:0 0 20px color-mix(in srgb, currentColor 45%, transparent);
+    transition:color .25s ease;
+  }
+  .vmg-num.opening{ color:var(--bad); }
+  .vmg-num.idle{ color:var(--muted); text-shadow:none; }
+  .vmg-label{ font-size:13px; letter-spacing:.18em; color:var(--muted); margin-top:8px; text-transform:uppercase; }
+  .vmg-unit{ font-family:var(--mono); font-size:16px; color:var(--muted); margin-top:1px; }
+
+  .state-tag{
+    text-align:center; font-size:13px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--muted); margin-top:10px; min-height:16px;
+  }
+  .state-tag.closing{ color:var(--good); }
+  .state-tag.opening{ color:var(--bad); }
+
+  /* readout grid */
+  .grid{
+    display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px;
+    background:var(--line); border:1px solid var(--line); border-radius:14px;
+    overflow:hidden; margin-top:16px;
+  }
+  .cell{ background:var(--panel); padding:13px 6px; text-align:center; }
+  .cell .k{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+  .cell .v{
+    font-family:var(--mono); font-variant-numeric:tabular-nums; white-space:nowrap;
+    font-size:clamp(26px, 8vw, 38px); margin-top:6px; color:var(--text); line-height:1;
+  }
+  .cell .u{ font-family:var(--mono); font-size:13px; color:var(--muted); margin-left:2px; }
+  .cell .v.mark{ color:var(--mark); }
+  .cell .v.cog{ color:var(--cog); }
+
+  .gps-row{
+    display:flex; align-items:center; justify-content:space-between;
+    margin-top:14px; font-size:13px; color:var(--muted);
+    font-family:var(--mono);
+  }
+  .dot{ width:8px; height:8px; border-radius:50%; background:var(--muted); display:inline-block; margin-right:7px; vertical-align:middle; }
+  .dot.ok{ background:var(--good); box-shadow:0 0 8px var(--good); }
+  .dot.warn{ background:var(--mark); }
+  .dot.err{ background:var(--bad); }
+
+  .tools{ display:flex; gap:10px; margin-top:14px; }
+  .tools button{
+    flex:1; font-family:var(--sans); font-size:13px; color:var(--text);
+    background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:11px 8px;
+  }
+  .tools button.on{ border-color:var(--good); color:var(--good); }
+
+  .empty-nav{
+    text-align:center; color:var(--muted); padding:40px 20px; font-size:14px; line-height:1.5;
+  }
+  .empty-nav b{ color:var(--text); display:block; margin-bottom:6px; font-size:16px; }
+
+  /* ---------- Waypoints view ---------- */
+  .section-title{ font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin:6px 0 10px; }
+  .add-card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:18px; }
+  .mode-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+  .chip{
+    font-family:var(--sans); font-size:13px; color:var(--muted);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:9px; padding:10px 8px;
+    transition:color .15s, border-color .15s, background .15s;
+  }
+  .chip.active{ color:var(--good); border-color:var(--good); background:color-mix(in srgb, var(--good) 10%, var(--panel-2)); }
+  .mode-fields[hidden]{ display:none; }
+  .opt{ color:var(--muted); font-size:9px; letter-spacing:.08em; text-transform:none; opacity:.7; }
+  .dist-input{ display:flex; gap:8px; }
+  .dist-input input{ flex:1; min-width:0; }
+  .unit-sel{
+    background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+    color:var(--text); font-family:var(--mono); font-size:14px; padding:0 10px; min-width:64px;
+  }
+  .unit-sel.wide{ width:100%; padding:11px 10px; font-family:var(--sans); }
+  .unit-sel:focus{ outline:none; border-color:var(--cog); }
+  .preview{
+    font-family:var(--mono); font-size:13px; color:var(--mark);
+    background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+    padding:10px 12px; margin-bottom:4px; line-height:1.45; word-break:break-word;
+  }
+  .preview.muted{ color:var(--muted); }
+  .field{ margin-bottom:10px; }
+  .field label{ display:block; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted); margin-bottom:5px; }
+  .field input{
+    width:100%; background:var(--panel-2); border:1px solid var(--line); border-radius:9px;
+    color:var(--text); font-family:var(--mono); font-size:15px; padding:11px 12px;
+  }
+  .field input:focus{ outline:none; border-color:var(--cog); }
+  .latlon{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .add-actions{ display:flex; gap:10px; margin-top:4px; }
+  .btn{
+    font-family:var(--sans); font-size:14px; border-radius:10px; padding:12px; border:1px solid var(--line);
+    background:var(--panel-2); color:var(--text); flex:1;
+  }
+  .btn.primary{ background:var(--good); color:#031712; border-color:var(--good); font-weight:600; }
+  .btn.ghost{ color:var(--text); }
+  .hint{ font-size:12px; color:var(--muted); margin-top:8px; line-height:1.45; }
+
+  .wp-list-head{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 10px; }
+  .wp-actions{ display:flex; gap:8px; }
+  .mini-btn{ font-family:var(--sans); font-size:12px; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 12px; }
+  .mini-btn:active{ border-color:var(--good); color:var(--good); }
+  ul.wps{ list-style:none; margin:0; padding:0; }
+  li.wp{
+    display:flex; align-items:center; gap:12px;
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:10px;
+  }
+  li.wp.sel{ border-color:var(--mark); box-shadow:0 0 0 1px var(--mark) inset; }
+  .wp-radio{
+    width:22px; height:22px; border-radius:50%; border:2px solid var(--muted); flex:none;
+    display:flex; align-items:center; justify-content:center;
+  }
+  li.wp.sel .wp-radio{ border-color:var(--mark); }
+  li.wp.sel .wp-radio::after{ content:""; width:11px; height:11px; border-radius:50%; background:var(--mark); }
+  .wp-main{ flex:1; min-width:0; }
+  .wp-name{ font-size:15px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wp-coords{ font-family:var(--mono); font-size:12px; color:var(--muted); margin-top:3px; }
+  .wp-dist{ font-family:var(--mono); font-size:13px; color:var(--mark); text-align:right; flex:none; }
+  .wp-del{ background:none; border:none; color:var(--muted); font-size:20px; padding:4px 8px; flex:none; }
+  .wps-empty{ text-align:center; color:var(--muted); padding:30px 10px; font-size:14px; }
+
+  /* ---------- Bottom nav ---------- */
+  nav{
+    display:flex; border-top:1px solid var(--line); background:var(--panel-2);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav button{
+    flex:1; background:none; border:none; color:var(--muted);
+    font-family:var(--sans); font-size:12px; letter-spacing:.04em;
+    padding:12px 0 10px; display:flex; flex-direction:column; align-items:center; gap:5px;
+  }
+  nav button svg{ width:22px; height:22px; stroke:currentColor; fill:none; stroke-width:1.7; }
+  nav button.active{ color:var(--good); }
+
+  .toast{
+    position:fixed; left:50%; bottom:80px; transform:translateX(-50%) translateY(20px);
+    background:var(--panel); border:1px solid var(--line); color:var(--text);
+    padding:11px 18px; border-radius:10px; font-size:13px; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; z-index:50; max-width:88vw; text-align:center;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ transition:none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="brand"><b>VMG</b></span>
+  <span class="active-wp" id="activeWpName">No mark selected</span>
+  <button class="units-btn" id="unitsBtn" type="button">kn</button>
+</header>
+
+<main>
+  <!-- ================= NAVIGATE ================= -->
+  <section class="view active" id="view-nav">
+    <div id="navContent">
+      <div class="dial-wrap">
+        <div class="dial">
+          <svg viewBox="0 0 200 200" id="dialSvg" aria-hidden="true">
+            <!-- card -->
+            <circle cx="100" cy="100" r="94" fill="#0B1B26" stroke="#1C3A4A" stroke-width="1.5"/>
+            <circle cx="100" cy="100" r="82" fill="none" stroke="#122C3B" stroke-width="1"/>
+            <!-- rotating compass card (course-up): ticks + cardinal letters -->
+            <g id="cardRot" transform="rotate(0 100 100)">
+              <g id="ticks"></g>
+              <text x="100" y="26" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#9FC0CE" id="lblN">N</text>
+              <text x="176" y="105" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">E</text>
+              <text x="100" y="184" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">S</text>
+              <text x="24" y="105" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">W</text>
+            </g>
+            <!-- fixed heading index (top) -->
+            <polygon points="100,4 95,15 105,15" fill="#5AA9D6"/>
+            <!-- waypoint needle (rotates to relative bearing) -->
+            <g id="needleRot" transform="rotate(0 100 100)">
+              <polygon points="100,20 92,104 108,104" fill="#F2B33D"/>
+              <polygon points="100,150 93,104 107,104" fill="#3a2f12"/>
+              <circle cx="100" cy="100" r="6" fill="#F2B33D"/>
+              <circle cx="100" cy="100" r="2.5" fill="#0B1B26"/>
+            </g>
+          </svg>
+          <div class="core">
+            <div class="vmg-num idle" id="vmgNum">--</div>
+            <div class="vmg-label">VMG</div>
+            <div class="vmg-unit" id="vmgUnit">kn</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="state-tag" id="stateTag"></div>
+
+      <div class="grid">
+        <div class="cell"><div class="k">Distance</div><div class="v" id="distVal">--<span class="u" id="distUnit"></span></div></div>
+        <div class="cell"><div class="k">Bearing</div><div class="v mark" id="brgVal">--<span class="u">°T</span></div></div>
+        <div class="cell"><div class="k">ETA</div><div class="v" id="etaVal">--</div></div>
+        <div class="cell"><div class="k">SOG</div><div class="v" id="sogVal">--<span class="u" id="sogUnit"></span></div></div>
+        <div class="cell"><div class="k">COG</div><div class="v cog" id="cogVal">--<span class="u">°T</span></div></div>
+        <div class="cell"><div class="k">Steer</div><div class="v" id="relVal">--<span class="u">°</span></div></div>
+      </div>
+
+      <div class="gps-row">
+        <span><span class="dot" id="gpsDot"></span><span id="gpsTxt">Waiting for GPS…</span></span>
+        <span id="fixAge"></span>
+      </div>
+
+      <div class="tools">
+        <button type="button" id="wakeBtn">Keep screen on</button>
+        <button type="button" id="orientBtn">Use compass</button>
+      </div>
+    </div>
+
+    <div class="empty-nav" id="navEmpty" style="display:none">
+      <b>No mark selected</b>
+      Add a waypoint and select it to start a live VMG reading.
+    </div>
+  </section>
+
+  <!-- ================= WAYPOINTS ================= -->
+  <section class="view" id="view-wp">
+    <div class="section-title">Add a waypoint</div>
+    <div class="add-card">
+      <div class="mode-grid" id="modeGrid">
+        <button type="button" class="chip active" data-mode="coords">Coordinates</button>
+        <button type="button" class="chip" data-mode="here">My position</button>
+        <button type="button" class="chip" data-mode="offset">Bearing &amp; distance</button>
+        <button type="button" class="chip" data-mode="fromwp">From a waypoint</button>
+      </div>
+
+      <div class="field">
+        <label for="wpName">Name <span class="opt">optional</span></label>
+        <input id="wpName" type="text" inputmode="text" placeholder="e.g. Harbour entrance" maxlength="40" />
+      </div>
+
+      <!-- mode: coordinates -->
+      <div class="mode-fields" data-mf="coords">
+        <div class="latlon">
+          <div class="field">
+            <label for="wpLat">Latitude</label>
+            <input id="wpLat" type="text" inputmode="decimal" placeholder="50.7601" />
+          </div>
+          <div class="field">
+            <label for="wpLon">Longitude</label>
+            <input id="wpLon" type="text" inputmode="decimal" placeholder="-1.1102" />
+          </div>
+        </div>
+        <div class="hint">Decimal degrees. You can also paste “lat, lon” into the latitude field.</div>
+      </div>
+
+      <!-- mode: my position -->
+      <div class="mode-fields" data-mf="here" hidden>
+        <div class="preview" id="herePreview">Waiting for GPS…</div>
+        <div class="hint">Saves a mark at your current GPS position.</div>
+      </div>
+
+      <!-- mode: bearing & distance from here -->
+      <div class="mode-fields" data-mf="offset" hidden>
+        <div class="latlon">
+          <div class="field">
+            <label for="offBrg">Bearing °T</label>
+            <input id="offBrg" type="text" inputmode="decimal" placeholder="045" />
+          </div>
+          <div class="field">
+            <label for="offDist">Distance</label>
+            <div class="dist-input">
+              <input id="offDist" type="text" inputmode="decimal" placeholder="1.5" />
+              <select id="offUnit" class="unit-sel"></select>
+            </div>
+          </div>
+        </div>
+        <div class="preview" id="offPreview">Bearing and distance from your current position.</div>
+      </div>
+
+      <!-- mode: from a waypoint -->
+      <div class="mode-fields" data-mf="fromwp" hidden>
+        <div class="field">
+          <label for="refWp">Measured from</label>
+          <select id="refWp" class="unit-sel wide"></select>
+        </div>
+        <div class="latlon">
+          <div class="field">
+            <label for="fwBrg">Bearing °T</label>
+            <input id="fwBrg" type="text" inputmode="decimal" placeholder="045" />
+          </div>
+          <div class="field">
+            <label for="fwDist">Distance</label>
+            <div class="dist-input">
+              <input id="fwDist" type="text" inputmode="decimal" placeholder="1.5" />
+              <select id="fwUnit" class="unit-sel"></select>
+            </div>
+          </div>
+        </div>
+        <div class="preview" id="fwPreview">Pick a reference waypoint.</div>
+      </div>
+
+      <div class="add-actions">
+        <button class="btn primary" type="button" id="addWpBtn">Add waypoint</button>
+      </div>
+    </div>
+
+    <div class="wp-list-head">
+      <div class="section-title" style="margin:0">Your waypoints</div>
+      <div class="wp-actions">
+        <button type="button" class="mini-btn" id="importBtn">Import</button>
+        <button type="button" class="mini-btn" id="exportBtn">Export</button>
+      </div>
+    </div>
+    <ul class="wps" id="wpList"></ul>
+    <div class="wps-empty" id="wpEmpty">No waypoints yet. Add one above.</div>
+    <div class="hint" style="margin-top:2px">Export saves a backup file you keep; Import restores it (also reads GPX). Use this so your marks survive even if the browser clears its storage.</div>
+    <input type="file" id="importFile" accept=".json,.gpx,application/json,application/gpx+xml" hidden />
+  </section>
+</main>
+
+<nav>
+  <button type="button" data-view="nav" class="active" id="tabNav">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polygon points="12,7 9,15 12,13 15,15" fill="currentColor" stroke="none"/></svg>
+    Navigate
+  </button>
+  <button type="button" data-view="wp" id="tabWp">
+    <svg viewBox="0 0 24 24"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
+    Waypoints
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+"use strict";
+
+/* ---------------- constants & helpers ---------------- */
+const R = 6371000; // earth radius (m)
+const toRad = d => d * Math.PI / 180;
+const toDeg = r => r * 180 / Math.PI;
+
+const UNIT_SETS = {
+  kn:  { sp: 1.943844, spName:"kn",  dl: 1/1852,    dlName:"nm", near:"m",  nearMul:1 },
+  kmh: { sp: 3.6,      spName:"km/h", dl: 1/1000,   dlName:"km", near:"m",  nearMul:1 },
+  mph: { sp: 2.236936, spName:"mph", dl: 1/1609.344, dlName:"mi", near:"ft", nearMul:3.28084 },
+};
+const UNIT_ORDER = ["kn","kmh","mph"];
+
+function haversine(a, b){
+  const φ1=toRad(a.lat), φ2=toRad(b.lat);
+  const dφ=toRad(b.lat-a.lat), dλ=toRad(b.lon-a.lon);
+  const s=Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2;
+  return 2*R*Math.asin(Math.min(1, Math.sqrt(s)));
+}
+function bearing(a, b){
+  const φ1=toRad(a.lat), φ2=toRad(b.lat), dλ=toRad(b.lon-a.lon);
+  const y=Math.sin(dλ)*Math.cos(φ2);
+  const x=Math.cos(φ1)*Math.sin(φ2)-Math.sin(φ1)*Math.cos(φ2)*Math.cos(dλ);
+  return (toDeg(Math.atan2(y,x))+360)%360;
+}
+function smoothAngle(prev, next, alpha){
+  if(prev==null || isNaN(prev)) return next;
+  const ps=Math.sin(toRad(prev)), pc=Math.cos(toRad(prev));
+  const ns=Math.sin(toRad(next)), nc=Math.cos(toRad(next));
+  const s=ps+alpha*(ns-ps), c=pc+alpha*(nc-pc);
+  return (toDeg(Math.atan2(s,c))+360)%360;
+}
+const $ = id => document.getElementById(id);
+
+/* ---------------- state ---------------- */
+const LS = { wps:"vmg.waypoints", active:"vmg.activeId", units:"vmg.units" };
+let waypoints = [];
+let activeId = null;
+let units = "kn";
+
+let pos = null;        // {lat,lon,t,acc,rawSpeed,rawHeading}
+let prevFix = null;
+let sog = 0;           // smoothed speed over ground (m/s)
+let cog = null;        // smoothed course over ground (deg true)
+let vmg = 0;           // m/s, +closing
+let compassHeading = null;  // device compass (deg true) if enabled
+let useCompass = false;
+let wakeLock = null;
+let watchId = null;
+
+/* ---------------- persistence ---------------- */
+function load(){
+  try{ waypoints = JSON.parse(localStorage.getItem(LS.wps)) || []; }catch(e){ waypoints=[]; }
+  activeId = localStorage.getItem(LS.active) || null;
+  units = localStorage.getItem(LS.units) || "kn";
+  if(!UNIT_SETS[units]) units="kn";
+}
+function saveWps(){ localStorage.setItem(LS.wps, JSON.stringify(waypoints)); }
+function saveActive(){ activeId ? localStorage.setItem(LS.active, activeId) : localStorage.removeItem(LS.active); }
+function saveUnits(){ localStorage.setItem(LS.units, units); }
+
+function activeWp(){ return waypoints.find(w => w.id === activeId) || null; }
+
+/* ---------------- toast ---------------- */
+let toastT;
+function toast(msg){
+  const t = $("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastT); toastT = setTimeout(()=>t.classList.remove("show"), 2200);
+}
+
+/* ---------------- build dial ticks once ---------------- */
+(function buildTicks(){
+  const g = $("ticks");
+  let s = "";
+  for(let i=0;i<72;i++){
+    const major = i%9===0, mid = i%3===0;
+    const a = toRad(i*5);
+    const r1 = 82, r2 = major?70:(mid?74:77);
+    const x1=100+r1*Math.sin(a), y1=100-r1*Math.cos(a);
+    const x2=100+r2*Math.sin(a), y2=100-r2*Math.cos(a);
+    s += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${major?'#3C6175':'#21465A'}" stroke-width="${major?1.4:1}"/>`;
+  }
+  g.innerHTML = s;
+})();
+
+/* ---------------- navigation render ---------------- */
+function fmtETA(sec){
+  if(!isFinite(sec) || sec<=0) return "--";
+  if(sec > 99*3600) return ">99h";
+  sec = Math.round(sec);
+  const h=Math.floor(sec/3600), m=Math.floor((sec%3600)/60), s=sec%60;
+  if(h>0) return `${h}:${String(m).padStart(2,"0")}`;
+  return `${m}:${String(s).padStart(2,"0")}`;
+}
+function fmtDist(m){
+  const U = UNIT_SETS[units];
+  // show "near" units under ~1000 m / a fraction of major unit
+  if(m < 1000){
+    const n = m * U.nearMul;
+    return { v: n<10 ? n.toFixed(1) : Math.round(n).toString(), u: U.near };
+  }
+  const d = m * U.dl;
+  return { v: d<10 ? d.toFixed(2) : d.toFixed(1), u: U.dlName };
+}
+
+function setNeedle(relBrg){
+  $("needleRot").setAttribute("transform", `rotate(${relBrg} 100 100)`);
+}
+function setCard(rot){
+  $("cardRot").setAttribute("transform", `rotate(${rot} 100 100)`);
+}
+
+function render(){
+  const U = UNIT_SETS[units];
+  const wp = activeWp();
+
+  // toggle nav vs empty
+  $("navContent").style.display = wp ? "" : "none";
+  $("navEmpty").style.display = wp ? "none" : "block";
+  $("activeWpName").textContent = wp ? wp.name : "No mark selected";
+  $("activeWpName").style.color = wp ? "var(--mark)" : "var(--muted)";
+  $("vmgUnit").textContent = U.spName;
+  if(!wp) return;
+
+  // reference heading for the dial (course-up or compass-up)
+  let ref = 0;
+  if(useCompass && compassHeading!=null) ref = compassHeading;
+  else if(cog!=null) ref = cog;
+  setCard(-ref);
+
+  const vmgNum = $("vmgNum");
+  const stateTag = $("stateTag");
+
+  if(!pos){
+    vmgNum.textContent = "--"; vmgNum.className="vmg-num idle";
+    stateTag.textContent=""; stateTag.className="state-tag";
+    return;
+  }
+
+  const dist = haversine(pos, wp);
+  const brg  = bearing(pos, wp);
+  const relBrg = (brg - ref + 360) % 360;
+  setNeedle(relBrg);
+
+  // relative angle off the bow (course-made-good sense) for "to go"
+  const relToCog = cog!=null ? (((brg - cog + 540)%360)-180) : null;
+
+  // VMG
+  let v = null;
+  if(cog!=null && sog>0.15){ v = sog * Math.cos(toRad(brg - cog)); }
+  else if(sog<=0.15){ v = 0; }
+  vmg = v==null ? 0 : v;
+
+  // VMG readout
+  if(v==null){
+    vmgNum.textContent="--"; vmgNum.className="vmg-num idle";
+    stateTag.textContent="waiting for course"; stateTag.className="state-tag";
+  } else {
+    const disp = Math.abs(v*U.sp);
+    vmgNum.textContent = disp.toFixed(disp<10?1:0);
+    if(sog<=0.2){
+      vmgNum.className="vmg-num idle";
+      stateTag.textContent="stationary"; stateTag.className="state-tag";
+    } else if(v>=0.05){
+      vmgNum.className="vmg-num";
+      stateTag.textContent="closing on mark"; stateTag.className="state-tag closing";
+    } else if(v<=-0.05){
+      vmgNum.className="vmg-num opening";
+      stateTag.textContent="losing ground"; stateTag.className="state-tag opening";
+    } else {
+      vmgNum.className="vmg-num idle";
+      stateTag.textContent="across the mark"; stateTag.className="state-tag";
+    }
+  }
+
+  // grid
+  const d = fmtDist(dist);
+  $("distVal").innerHTML = `${d.v}<span class="u">${d.u}</span>`;
+  $("brgVal").innerHTML = `${Math.round(brg)}<span class="u">°T</span>`;
+  $("sogVal").innerHTML = `${(sog*U.sp).toFixed(1)}<span class="u">${U.spName}</span>`;
+  $("cogVal").innerHTML = cog!=null ? `${Math.round(cog)}<span class="u">°T</span>` : `--<span class="u">°T</span>`;
+  if(relToCog==null){ $("relVal").innerHTML = `--<span class="u">°</span>`; }
+  else { const m=Math.round(Math.abs(relToCog)); $("relVal").innerHTML = m<1 ? `0<span class="u">°</span>` : `${m}<span class="u">°${relToCog>0?"R":"L"}</span>`; }
+  $("etaVal").textContent = (v && v>0.05) ? fmtETA(dist / v) : "--";
+}
+
+/* ---------------- GPS ---------------- */
+function onFix(p){
+  const c = p.coords;
+  const t = p.timestamp;
+  const cur = { lat:c.latitude, lon:c.longitude, t, acc:c.accuracy };
+
+  // speed
+  let rawSpeed = (typeof c.speed==="number" && c.speed>=0 && isFinite(c.speed)) ? c.speed : null;
+  // heading
+  let rawHeading = (typeof c.heading==="number" && isFinite(c.heading) && c.speed>0.4) ? c.heading : null;
+
+  // derive from previous fix when device doesn't supply them
+  if(prevFix){
+    const dt = (t - prevFix.t)/1000;
+    if(dt>0.05){
+      const moved = haversine(prevFix, cur);
+      if(rawSpeed==null) rawSpeed = moved/dt;
+      if(rawHeading==null && moved>Math.max(3, (cur.acc||10)*0.6)){
+        rawHeading = bearing(prevFix, cur);
+      }
+    }
+  }
+
+  // smooth
+  if(rawSpeed!=null) sog = sog + 0.4*(rawSpeed - sog);
+  if(rawHeading!=null && (rawSpeed==null || rawSpeed>0.4)) cog = smoothAngle(cog, rawHeading, 0.35);
+
+  pos = cur; prevFix = cur;
+  updateGps(c.accuracy, t);
+  render();
+  renderWpDistances();
+  updateAddPreviews();
+}
+function onGpsError(err){
+  const dot=$("gpsDot"), txt=$("gpsTxt");
+  dot.className="dot err";
+  if(err.code===1) txt.textContent="Location permission denied";
+  else if(err.code===2) txt.textContent="Position unavailable";
+  else if(err.code===3) txt.textContent="GPS timed out";
+  else txt.textContent="GPS error";
+}
+function updateGps(acc, t){
+  const dot=$("gpsDot"), txt=$("gpsTxt");
+  if(acc<=15) dot.className="dot ok";
+  else if(acc<=40) dot.className="dot warn";
+  else dot.className="dot err";
+  txt.textContent = `±${Math.round(acc)} m`;
+  $("fixAge").textContent = "live";
+}
+function startGps(){
+  if(!("geolocation" in navigator)){ $("gpsTxt").textContent="Geolocation not supported"; $("gpsDot").className="dot err"; return; }
+  if(watchId!=null) return;
+  watchId = navigator.geolocation.watchPosition(onFix, onGpsError, {
+    enableHighAccuracy:true, maximumAge:0, timeout:15000
+  });
+}
+// age ticker
+setInterval(()=>{
+  if(pos){
+    const age=(Date.now()-pos.t)/1000;
+    if(age>4){ $("fixAge").textContent = `${Math.round(age)}s ago`; $("gpsDot").classList.contains("err")||($("gpsDot").className="dot warn"); }
+  }
+}, 1000);
+
+/* ---------------- compass (optional) ---------------- */
+function onOrient(e){
+  let h=null;
+  if(typeof e.webkitCompassHeading==="number"){ h=e.webkitCompassHeading; } // iOS, already true-ish
+  else if(e.absolute && typeof e.alpha==="number"){ h=(360-e.alpha)%360; }
+  if(h!=null){ compassHeading = smoothAngle(compassHeading, h, 0.2); }
+}
+async function toggleCompass(){
+  if(useCompass){
+    useCompass=false; window.removeEventListener("deviceorientationabsolute",onOrient); window.removeEventListener("deviceorientation",onOrient);
+    $("orientBtn").classList.remove("on"); $("orientBtn").textContent="Use compass"; render(); return;
+  }
+  try{
+    if(typeof DeviceOrientationEvent!=="undefined" && typeof DeviceOrientationEvent.requestPermission==="function"){
+      const r = await DeviceOrientationEvent.requestPermission();
+      if(r!=="granted"){ toast("Compass permission denied"); return; }
+    }
+    window.addEventListener("deviceorientationabsolute", onOrient, true);
+    window.addEventListener("deviceorientation", onOrient, true);
+    useCompass=true; $("orientBtn").classList.add("on"); $("orientBtn").textContent="Compass on";
+  }catch(e){ toast("Compass unavailable"); }
+}
+
+/* ---------------- wake lock ---------------- */
+async function toggleWake(){
+  if(!("wakeLock" in navigator)){ toast("Screen lock not supported"); return; }
+  if(wakeLock){
+    try{ await wakeLock.release(); }catch(e){}
+    wakeLock=null; $("wakeBtn").classList.remove("on"); $("wakeBtn").textContent="Keep screen on"; return;
+  }
+  try{
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", ()=>{ $("wakeBtn").classList.remove("on"); $("wakeBtn").textContent="Keep screen on"; wakeLock=null; });
+    $("wakeBtn").classList.add("on"); $("wakeBtn").textContent="Screen stays on";
+  }catch(e){ toast("Couldn't keep screen on"); }
+}
+document.addEventListener("visibilitychange", async ()=>{
+  if(document.visibilityState==="visible" && wakeLock===null && $("wakeBtn").classList.contains("on")){
+    try{ wakeLock = await navigator.wakeLock.request("screen"); }catch(e){}
+  }
+});
+
+/* ---------------- waypoint list ---------------- */
+function renderWpList(){
+  const ul=$("wpList"); ul.innerHTML="";
+  $("wpEmpty").style.display = waypoints.length ? "none" : "block";
+  waypoints.forEach(w=>{
+    const li=document.createElement("li");
+    li.className="wp"+(w.id===activeId?" sel":"");
+    li.innerHTML = `
+      <div class="wp-radio"></div>
+      <div class="wp-main">
+        <div class="wp-name"></div>
+        <div class="wp-coords">${w.lat.toFixed(5)}, ${w.lon.toFixed(5)}</div>
+      </div>
+      <div class="wp-dist" data-dist></div>
+      <button class="wp-del" aria-label="Delete">×</button>`;
+    li.querySelector(".wp-name").textContent = w.name;
+    li.addEventListener("click", e=>{
+      if(e.target.closest(".wp-del")) return;
+      activeId = w.id; saveActive(); renderWpList(); render(); switchView("nav");
+    });
+    li.querySelector(".wp-del").addEventListener("click", e=>{
+      e.stopPropagation();
+      waypoints = waypoints.filter(x=>x.id!==w.id);
+      if(activeId===w.id){ activeId=null; saveActive(); }
+      saveWps(); renderWpList(); render();
+      toast("Waypoint deleted");
+    });
+    ul.appendChild(li);
+  });
+  renderWpDistances();
+  populateRefWp();
+}
+function renderWpDistances(){
+  if(!pos) return;
+  document.querySelectorAll("#wpList .wp").forEach((li,i)=>{
+    const w=waypoints[i]; if(!w) return;
+    const el=li.querySelector("[data-dist]");
+    const d=fmtDist(haversine(pos,w));
+    el.textContent = `${d.v} ${d.u}`;
+  });
+}
+
+/* ---------------- add waypoint ---------------- */
+const DIST_UNITS = { m:1, km:1000, nm:1852, mi:1609.344 };
+const DIST_UNIT_ORDER = ["m","km","nm","mi"];
+let addMode = "coords";
+
+// destination point given start, bearing (deg true) and distance (m): direct geodesic on a sphere
+function destPoint(lat, lon, brgDeg, distM){
+  const d = distM / R, th = toRad(brgDeg);
+  const f1 = toRad(lat), l1 = toRad(lon);
+  const sf2 = Math.sin(f1)*Math.cos(d) + Math.cos(f1)*Math.sin(d)*Math.cos(th);
+  const f2 = Math.asin(Math.max(-1, Math.min(1, sf2)));
+  const y = Math.sin(th)*Math.sin(d)*Math.cos(f1);
+  const x = Math.cos(d) - Math.sin(f1)*sf2;
+  let lo = toDeg(l1 + Math.atan2(y, x));
+  lo = ((lo + 540) % 360) - 180; // normalize to -180..180
+  return { lat: toDeg(f2), lon: lo };
+}
+function parseNum(s){ const n=parseFloat(String(s).trim()); return isFinite(n)?n:null; }
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function defaultDistUnit(){ return UNIT_SETS[units].dlName; } // nm | km | mi
+
+function populateUnitSel(sel){
+  if(!sel) return;
+  sel.innerHTML = DIST_UNIT_ORDER.map(u=>`<option value="${u}">${u}</option>`).join("");
+  sel.value = defaultDistUnit();
+}
+function populateRefWp(){
+  const sel=$("refWp"); if(!sel) return;
+  const prev=sel.value;
+  if(!waypoints.length){
+    sel.innerHTML = `<option value="">— add a waypoint first —</option>`; sel.value="";
+  } else {
+    sel.innerHTML = waypoints.map(w=>`<option value="${w.id}">${escapeHtml(w.name)}</option>`).join("");
+    sel.value = waypoints.some(w=>w.id===prev) ? prev : waypoints[0].id;
+  }
+}
+function setMode(m){
+  addMode=m;
+  document.querySelectorAll("#modeGrid .chip").forEach(c=>c.classList.toggle("active", c.dataset.mode===m));
+  document.querySelectorAll(".mode-fields").forEach(f=> f.hidden = (f.dataset.mf!==m));
+  if(m==="fromwp") populateRefWp();
+  updateAddPreviews();
+}
+function readBrgDist(brgId, distId, unitId){
+  const brg=parseNum($(brgId).value), dist=parseNum($(distId).value), unit=$(unitId).value;
+  if(brg==null || dist==null || dist<0) return null;
+  return { brg:((brg%360)+360)%360, dist, unit, distM: dist*DIST_UNITS[unit] };
+}
+function updateAddPreviews(){
+  const hp=$("herePreview");
+  if(hp){
+    if(pos){ hp.textContent=`${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}  ±${Math.round(pos.acc)} m`; hp.classList.remove("muted"); }
+    else { hp.textContent="Waiting for GPS…"; hp.classList.add("muted"); }
+  }
+  const op=$("offPreview");
+  if(op){
+    const bd=readBrgDist("offBrg","offDist","offUnit");
+    if(!pos){ op.textContent="Waiting for GPS…"; op.classList.add("muted"); }
+    else if(!bd){ op.textContent="Bearing and distance from your current position."; op.classList.add("muted"); }
+    else { const d=destPoint(pos.lat,pos.lon,bd.brg,bd.distM); op.textContent=`→  ${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`; op.classList.remove("muted"); }
+  }
+  const fp=$("fwPreview");
+  if(fp){
+    const ref=waypoints.find(w=>w.id===($("refWp")&&$("refWp").value));
+    const bd=readBrgDist("fwBrg","fwDist","fwUnit");
+    if(!ref){ fp.textContent="Pick a reference waypoint."; fp.classList.add("muted"); }
+    else if(!bd){ fp.textContent=`Bearing and distance from ${ref.name}.`; fp.classList.add("muted"); }
+    else { const d=destPoint(ref.lat,ref.lon,bd.brg,bd.distM); fp.textContent=`→  ${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}`; fp.classList.remove("muted"); }
+  }
+}
+let idSeq=0;
+function newId(){ return "w"+Date.now().toString(36)+(idSeq++).toString(36)+Math.random().toString(36).slice(2,4); }
+function pushWaypoint(name, lat, lon){
+  const w={ id:newId(), name, lat, lon };
+  waypoints.push(w); saveWps(); renderWpList();
+  toast("Waypoint added");
+}
+function addWaypoint(){
+  const name=$("wpName").value.trim();
+
+  if(addMode==="coords"){
+    let latStr=$("wpLat").value.trim(), lonStr=$("wpLon").value.trim();
+    if(lonStr==="" && /[,; ]/.test(latStr)){
+      const parts=latStr.split(/[,;]\s*|\s+/).filter(Boolean);
+      if(parts.length>=2){ latStr=parts[0]; lonStr=parts[1]; }
+    }
+    const lat=parseNum(latStr), lon=parseNum(lonStr);
+    if(lat==null||lon==null){ toast("Enter valid coordinates"); return; }
+    if(lat<-90||lat>90||lon<-180||lon>180){ toast("Coordinates out of range"); return; }
+    pushWaypoint(name || `${lat.toFixed(3)}, ${lon.toFixed(3)}`, lat, lon);
+    $("wpName").value=""; $("wpLat").value=""; $("wpLon").value="";
+
+  } else if(addMode==="here"){
+    if(!pos){ toast("No GPS fix yet"); return; }
+    const t=new Date(pos.t), hh=String(t.getHours()).padStart(2,"0"), mm=String(t.getMinutes()).padStart(2,"0");
+    pushWaypoint(name || `Mark ${hh}:${mm}`, pos.lat, pos.lon);
+    $("wpName").value="";
+
+  } else if(addMode==="offset"){
+    if(!pos){ toast("No GPS fix yet"); return; }
+    const bd=readBrgDist("offBrg","offDist","offUnit");
+    if(!bd){ toast("Enter bearing and distance"); return; }
+    const d=destPoint(pos.lat,pos.lon,bd.brg,bd.distM);
+    pushWaypoint(name || `${Math.round(bd.brg)}°/${bd.dist}${bd.unit} from here`, d.lat, d.lon);
+    $("wpName").value=""; $("offBrg").value=""; $("offDist").value=""; updateAddPreviews();
+
+  } else if(addMode==="fromwp"){
+    const ref=waypoints.find(w=>w.id===$("refWp").value);
+    if(!ref){ toast("Pick a reference waypoint"); return; }
+    const bd=readBrgDist("fwBrg","fwDist","fwUnit");
+    if(!bd){ toast("Enter bearing and distance"); return; }
+    const d=destPoint(ref.lat,ref.lon,bd.brg,bd.distM);
+    pushWaypoint(name || `${Math.round(bd.brg)}°/${bd.dist}${bd.unit} from ${ref.name}`, d.lat, d.lon);
+    $("wpName").value=""; $("fwBrg").value=""; $("fwDist").value=""; updateAddPreviews();
+  }
+}
+
+/* ---------------- export / import ---------------- */
+function download(filename, text, mime){
+  const blob = new Blob([text], { type: mime || "application/octet-stream" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.rel = "noopener";
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 1500);
+}
+function exportWaypoints(){
+  if(!waypoints.length){ toast("No waypoints to export"); return; }
+  const data = { app:"VMG", version:1, exported:new Date().toISOString(),
+                 waypoints: waypoints.map(w=>({ name:w.name, lat:w.lat, lon:w.lon })) };
+  const stamp = new Date().toISOString().slice(0,10);
+  download(`vmg-waypoints-${stamp}.json`, JSON.stringify(data, null, 2), "application/json");
+  toast(`Exported ${waypoints.length} waypoint${waypoints.length>1?"s":""}`);
+}
+function parseGpx(text){
+  const doc = new DOMParser().parseFromString(text, "application/xml");
+  return Array.from(doc.getElementsByTagName("wpt")).map(w=>({
+    lat: parseFloat(w.getAttribute("lat")),
+    lon: parseFloat(w.getAttribute("lon")),
+    name: (w.getElementsByTagName("name")[0]?.textContent || "").trim().slice(0,40)
+  }));
+}
+function importWaypoints(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const text = String(reader.result);
+      let incoming;
+      if(file.name.toLowerCase().endsWith(".gpx") || /^\s*<\?xml|<gpx/i.test(text)){
+        incoming = parseGpx(text);
+      } else {
+        const obj = JSON.parse(text);
+        const arr = Array.isArray(obj) ? obj : (obj.waypoints || []);
+        incoming = arr.map(w=>({ name:String(w.name||"").slice(0,40), lat:Number(w.lat), lon:Number(w.lon) }));
+      }
+      incoming = incoming.filter(w=> isFinite(w.lat)&&isFinite(w.lon)&&w.lat>=-90&&w.lat<=90&&w.lon>=-180&&w.lon<=180);
+      if(!incoming.length){ toast("No valid waypoints in that file"); return; }
+      let added=0;
+      for(const w of incoming){
+        const dup = waypoints.some(x=> Math.abs(x.lat-w.lat)<1e-7 && Math.abs(x.lon-w.lon)<1e-7 && x.name===(w.name||x.name));
+        if(dup) continue;
+        waypoints.push({ id:newId(), name:w.name || `${w.lat.toFixed(3)}, ${w.lon.toFixed(3)}`, lat:w.lat, lon:w.lon });
+        added++;
+      }
+      saveWps(); renderWpList();
+      toast(added ? `Imported ${added} waypoint${added!==1?"s":""}` : "Already up to date — nothing new");
+    }catch(e){ toast("Couldn't read that file"); }
+  };
+  reader.onerror = ()=> toast("Couldn't read that file");
+  reader.readAsText(file);
+}
+
+/* ---------------- views & units ---------------- */
+function switchView(v){
+  $("view-nav").classList.toggle("active", v==="nav");
+  $("view-wp").classList.toggle("active", v==="wp");
+  $("tabNav").classList.toggle("active", v==="nav");
+  $("tabWp").classList.toggle("active", v==="wp");
+  window.scrollTo(0,0);
+}
+function cycleUnits(){
+  const i=UNIT_ORDER.indexOf(units);
+  units=UNIT_ORDER[(i+1)%UNIT_ORDER.length]; saveUnits();
+  $("unitsBtn").textContent = UNIT_SETS[units].spName;
+  render(); renderWpDistances();
+}
+
+/* ---------------- wire up ---------------- */
+function init(){
+  load();
+  $("unitsBtn").textContent = UNIT_SETS[units].spName;
+  document.querySelectorAll("nav button").forEach(b=> b.addEventListener("click", ()=>switchView(b.dataset.view)));
+  $("unitsBtn").addEventListener("click", cycleUnits);
+  $("addWpBtn").addEventListener("click", addWaypoint);
+  $("wakeBtn").addEventListener("click", toggleWake);
+  $("orientBtn").addEventListener("click", toggleCompass);
+  $("exportBtn").addEventListener("click", exportWaypoints);
+  $("importBtn").addEventListener("click", ()=> $("importFile").click());
+  $("importFile").addEventListener("change", e=>{
+    const f = e.target.files && e.target.files[0];
+    if(f) importWaypoints(f);
+    e.target.value = "";
+  });
+
+  // waypoint-creation modes
+  document.querySelectorAll("#modeGrid .chip").forEach(c=> c.addEventListener("click", ()=>setMode(c.dataset.mode)));
+  populateUnitSel($("offUnit"));
+  populateUnitSel($("fwUnit"));
+  ["offBrg","offDist","offUnit","fwBrg","fwDist","fwUnit","refWp"].forEach(id=>{
+    const el=$(id); if(el){ el.addEventListener("input", updateAddPreviews); el.addEventListener("change", updateAddPreviews); }
+  });
+
+  renderWpList();
+  render();
+  updateAddPreviews();
+  startGps();
+
+  if("serviceWorker" in navigator){
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  }
+}
+init();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "VMG — Velocity Made Good",
+  "short_name": "VMG",
+  "description": "Live velocity made good, distance and bearing to a waypoint using your phone's GPS.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#06121A",
+  "theme_color": "#06121A",
+  "categories": ["navigation", "utilities", "sports"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
