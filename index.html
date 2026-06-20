@@ -260,8 +260,9 @@
   .big-arrow{ width:clamp(64px, 22vw, 130px); height:clamp(64px, 22vw, 130px); margin-bottom:-4px; transition:transform .25s ease; }
   .big-vmg{
     font-family:var(--mono); font-weight:700; font-variant-numeric:tabular-nums;
-    font-size:clamp(110px, 40vw, 280px); line-height:.86; letter-spacing:-.03em; color:var(--good);
+    font-size:clamp(92px, 33vw, 230px); line-height:.86; letter-spacing:-.03em; color:var(--good);
     text-shadow:0 0 30px color-mix(in srgb, currentColor 40%, transparent);
+    max-width:100%; overflow:hidden;
   }
   .big-vmg.opening{ color:var(--bad); }
   .big-vmg.idle{ color:var(--muted); text-shadow:none; }
@@ -488,7 +489,7 @@
     <button class="btn primary" type="button" id="openBig" style="width:100%">Open big display</button>
     <div class="hint">A stripped-down, extra-large readout — VMG, distance and steer — for reading from across the cockpit. Tap it anywhere to exit.</div>
 
-    <div class="hint" style="margin-top:22px; opacity:.5; text-align:center">Build 8 — names tidied</div>
+    <div class="hint" style="margin-top:22px; opacity:.5; text-align:center">Build 9 — VMG decimal</div>
   </section>
 </main>
 
@@ -699,7 +700,7 @@ function render(){
   let vmgText, vmgKind, stateText;
   if(v==null){ vmgText="--"; vmgKind="idle"; stateText="waiting for course"; }
   else {
-    const dd = Math.abs(v*U.sp); vmgText = dd.toFixed(dd<10?1:0);
+    const dd = Math.abs(v*U.sp); vmgText = dd.toFixed(1);
     if(sog<=0.2){ vmgKind="idle"; stateText="stationary"; }
     else if(v>=0.05){ vmgKind="closing"; stateText="closing on mark"; }
     else if(v<=-0.05){ vmgKind="opening"; stateText="losing ground"; }
