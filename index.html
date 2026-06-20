@@ -4,6 +4,9 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
 <title>VMG — Velocity Made Good</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet" />
 <meta name="description" content="Live velocity made good, distance and bearing to a waypoint using your phone's GPS." />
 
 <!-- PWA -->
@@ -53,7 +56,13 @@
     padding:12px 16px 10px;
     border-bottom:1px solid var(--line);
   }
-  .brand{ font-weight:700; letter-spacing:.14em; font-size:13px; color:var(--muted); }
+  /* Title face: real ITC Data 70 if you drop it in /fonts, else free lookalike Audiowide */
+  @font-face{
+    font-family:'Data 70';
+    src:url('fonts/data70.woff2') format('woff2'), url('fonts/data70.woff') format('woff');
+    font-display:swap;
+  }
+  .brand{ font-family:'Data 70','Audiowide',var(--sans); font-weight:700; letter-spacing:.06em; font-size:15px; color:var(--text); white-space:nowrap; }
   .brand b{ color:var(--text); }
   .active-wp{
     flex:1; min-width:0;
@@ -270,7 +279,7 @@
 <body>
 
 <header>
-  <span class="brand"><b>VMG</b></span>
+  <span class="brand"><b>Intergalactic VMG</b></span>
   <span class="active-wp" id="activeWpName">No mark selected</span>
   <button class="units-btn" id="unitsBtn" type="button">kn</button>
 </header>
@@ -479,7 +488,7 @@
     <button class="btn primary" type="button" id="openBig" style="width:100%">Open big display</button>
     <div class="hint">A stripped-down, extra-large readout — VMG, distance and steer — for reading from across the cockpit. Tap it anywhere to exit.</div>
 
-    <div class="hint" style="margin-top:22px; opacity:.5; text-align:center">Build 5 — coordinate formats</div>
+    <div class="hint" style="margin-top:22px; opacity:.5; text-align:center">Build 8 — names tidied</div>
   </section>
 </main>
 

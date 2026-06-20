@@ -1,7 +1,7 @@
 /* VMG service worker — network-first shell so updates appear when online,
    cache fallback so it still works offline.
    Bump VERSION whenever you change icons/manifest to force a clean re-cache. */
-const VERSION = 'v6-2026-06-20';
+const VERSION = 'v9-2026-06-20';
 const CACHE = 'vmg-' + VERSION;
 const ASSETS = [
   './', 'index.html', 'manifest.webmanifest',
