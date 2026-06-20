@@ -1,4 +1,4 @@
-Intergalactic VMG — Velocity Made Good (installable PWA)
+VMG — Velocity Made Good (installable PWA)
 ==========================================
 
 A self-contained navigation instrument. It uses your phone's GPS to show:
