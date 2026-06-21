@@ -67,7 +67,7 @@
   .active-wp{
     flex:1; min-width:0;
     font-size:15px; color:var(--mark);
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:center;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; text-align:right;
   }
   .units-btn{
     font-family:var(--mono); font-size:15px; color:var(--text);
@@ -82,23 +82,25 @@
   /* ---------- Navigate view ---------- */
   .dial-wrap{ display:flex; justify-content:center; margin:6px 0 2px; }
   .dial{ width:min(78vw, 320px); aspect-ratio:1; position:relative; }
-  .dial svg{ width:100%; height:100%; display:block; }
+  .dial svg{ width:100%; height:100%; display:block; overflow:visible; }
   .core{
     position:absolute; inset:0; display:flex; flex-direction:column;
-    align-items:center; justify-content:center; pointer-events:none;
+    align-items:center; justify-content:flex-end; pointer-events:none;
+    transform:translateY(-1%);
   }
   .vmg-num{
     font-family:var(--mono); font-weight:600;
-    font-size:clamp(56px, 22vw, 108px); line-height:.92;
+    font-size:clamp(91px, 35vw, 176px); line-height:.92;
     font-variant-numeric:tabular-nums; letter-spacing:-.02em;
-    color:var(--good);
+    color:var(--good); max-width:100%; overflow:hidden;
     text-shadow:0 0 20px color-mix(in srgb, currentColor 45%, transparent);
     transition:color .25s ease;
   }
   .vmg-num.opening{ color:var(--bad); }
   .vmg-num.idle{ color:var(--muted); text-shadow:none; }
-  .vmg-label{ font-size:13px; letter-spacing:.18em; color:var(--muted); margin-top:8px; text-transform:uppercase; }
-  .vmg-unit{ font-family:var(--mono); font-size:16px; color:var(--muted); margin-top:1px; }
+  .vmg-meta{ display:flex; justify-content:space-between; align-items:baseline; width:100%; margin-top:6px; }
+  .vmg-label{ font-size:26px; letter-spacing:.18em; color:var(--muted); text-transform:uppercase; }
+  .vmg-unit{ font-family:var(--mono); font-size:32px; color:var(--muted); }
 
   .state-tag{
     text-align:center; font-size:13px; letter-spacing:.16em; text-transform:uppercase;
@@ -156,6 +158,7 @@
   }
   .chip.active{ color:var(--good); border-color:var(--good); background:color-mix(in srgb, var(--good) 10%, var(--panel-2)); }
   .mode-fields[hidden]{ display:none; }
+  .lt-fields[hidden]{ display:none; }
   .opt{ color:var(--muted); font-size:9px; letter-spacing:.08em; text-transform:none; opacity:.7; }
   .dist-input{ display:flex; gap:8px; }
   .dist-input input{ flex:1; min-width:0; }
@@ -260,7 +263,7 @@
   .big-arrow{ width:clamp(64px, 22vw, 130px); height:clamp(64px, 22vw, 130px); margin-bottom:-4px; transition:transform .25s ease; }
   .big-vmg{
     font-family:var(--mono); font-weight:700; font-variant-numeric:tabular-nums;
-    font-size:clamp(92px, 33vw, 230px); line-height:.86; letter-spacing:-.03em; color:var(--good);
+    font-size:clamp(120px, 44vw, 320px); line-height:.86; letter-spacing:-.03em; color:var(--good);
     text-shadow:0 0 30px color-mix(in srgb, currentColor 40%, transparent);
     max-width:100%; overflow:hidden;
   }
@@ -282,7 +285,6 @@
 <header>
   <span class="brand"><b>Intergalactic VMG</b></span>
   <span class="active-wp" id="activeWpName">No mark selected</span>
-  <button class="units-btn" id="unitsBtn" type="button">kn</button>
 </header>
 
 <main>
@@ -298,13 +300,13 @@
             <!-- rotating compass card (course-up): ticks + cardinal letters -->
             <g id="cardRot" transform="rotate(0 100 100)">
               <g id="ticks"></g>
-              <text x="100" y="26" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#9FC0CE" id="lblN">N</text>
-              <text x="176" y="105" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">E</text>
-              <text x="100" y="184" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">S</text>
-              <text x="24" y="105" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">W</text>
+              <text x="100" y="17" text-anchor="middle" font-family="ui-monospace,monospace" font-size="13" fill="#9FC0CE" id="lblN">N</text>
+              <text x="188" y="104" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">E</text>
+              <text x="100" y="192" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">S</text>
+              <text x="12" y="104" text-anchor="middle" font-family="ui-monospace,monospace" font-size="11" fill="#5C7C8A">W</text>
             </g>
-            <!-- fixed heading index (top) -->
-            <polygon points="100,4 95,15 105,15" fill="#5AA9D6"/>
+            <!-- fixed heading index (top, above the outer ring) -->
+            <polygon points="100,-9 93,3 107,3" fill="#5AA9D6"/>
             <!-- waypoint needle (rotates to relative bearing) -->
             <g id="needleRot" transform="rotate(0 100 100)">
               <polygon points="100,20 92,104 108,104" fill="#F2B33D"/>
@@ -315,8 +317,10 @@
           </svg>
           <div class="core">
             <div class="vmg-num idle" id="vmgNum">--</div>
-            <div class="vmg-label">VMG</div>
-            <div class="vmg-unit" id="vmgUnit">kn</div>
+            <div class="vmg-meta">
+              <div class="vmg-label">VMG</div>
+              <div class="vmg-unit" id="vmgUnit">kn</div>
+            </div>
           </div>
         </div>
       </div>
@@ -344,8 +348,8 @@
     </div>
 
     <div class="empty-nav" id="navEmpty" style="display:none">
-      <b>No mark selected</b>
-      Add a waypoint and select it to start a live VMG reading.
+      <b id="navEmptyTitle">No mark selected</b>
+      <span id="navEmptyMsg">Add a waypoint and select it to start a live VMG reading.</span>
     </div>
   </section>
 
@@ -451,6 +455,40 @@
     <div class="hint" style="margin-top:2px">Export saves a backup file you keep; Import restores it (also reads GPX). Use this so your marks survive even if the browser clears its storage.</div>
     <input type="file" id="importFile" accept=".json,.gpx,application/json,application/gpx+xml" hidden />
   </section>
+
+  <!-- ===================== LINES ===================== -->
+  <section class="view" id="view-lines">
+    <div class="section-title">Add a line</div>
+    <div class="add-card">
+      <div class="seg" id="segLineType">
+        <button type="button" data-lt="twopt">Two waypoints</button>
+        <button type="button" data-lt="wind">Wind + mark</button>
+      </div>
+
+      <div class="field" style="margin-top:12px">
+        <label>Name <span class="opt">optional</span></label>
+        <input id="lineName" type="text" inputmode="text" maxlength="40" placeholder="e.g. Start line" />
+      </div>
+
+      <div class="lt-fields" data-ltf="twopt">
+        <div class="field"><label>From waypoint</label><select id="lineA" class="unit-sel wide"></select></div>
+        <div class="field"><label>To waypoint</label><select id="lineB" class="unit-sel wide"></select></div>
+      </div>
+
+      <div class="lt-fields" data-ltf="wind" hidden>
+        <div class="field"><label>Through waypoint</label><select id="lineWp" class="unit-sel wide"></select></div>
+        <div class="field"><label>Wind direction °T</label><input id="lineWind" type="text" inputmode="decimal" placeholder="270" /></div>
+      </div>
+
+      <div class="preview" id="linePreview">Pick two different waypoints.</div>
+      <div class="add-actions"><button class="btn primary" type="button" id="addLineBtn">Add line</button></div>
+      <div class="hint">A line gives VMG to the nearest point on it. Two-waypoint = a straight line through both marks. Wind + mark = a line through the mark, square to the wind, so VMG reads progress straight to/from that mark up- or down-wind.</div>
+    </div>
+
+    <div class="section-title">Your lines</div>
+    <ul class="wps" id="lineList"></ul>
+    <div class="wps-empty" id="linesEmpty">No lines yet. Add one above (you’ll need at least two waypoints first).</div>
+  </section>
   <!-- ===================== OPTIONS ===================== -->
   <section class="view" id="view-opt">
     <div class="section-title">Speed units</div>
@@ -489,7 +527,7 @@
     <button class="btn primary" type="button" id="openBig" style="width:100%">Open big display</button>
     <div class="hint">A stripped-down, extra-large readout — VMG, distance and steer — for reading from across the cockpit. Tap it anywhere to exit.</div>
 
-    <div class="hint" style="margin-top:22px; opacity:.5; text-align:center">Build 9 — VMG decimal</div>
+    <div class="hint" style="margin-top:22px; opacity:.5; text-align:center">Build 16 — VMG +30%</div>
   </section>
 </main>
 
@@ -501,6 +539,10 @@
   <button type="button" data-view="wp" id="tabWp">
     <svg viewBox="0 0 24 24"><path d="M12 21s7-6.4 7-11a7 7 0 1 0-14 0c0 4.6 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>
     Waypoints
+  </button>
+  <button type="button" data-view="lines" id="tabLines">
+    <svg viewBox="0 0 24 24"><line x1="4" y1="20" x2="20" y2="4"/><circle cx="4" cy="20" r="1.8" fill="currentColor" stroke="none"/><circle cx="20" cy="4" r="1.8" fill="currentColor" stroke="none"/></svg>
+    Lines
   </button>
   <button type="button" data-view="opt" id="tabOpt">
     <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 4v2.2M12 17.8V20M4 12h2.2M17.8 12H20M6.3 6.3l1.6 1.6M16.1 16.1l1.6 1.6M17.7 6.3l-1.6 1.6M7.9 16.1l-1.6 1.6"/></svg>
@@ -569,6 +611,9 @@ let units = "kn";
 let northMode = "true";   // "true" | "mag"
 let variation = 0;        // magnetic variation in degrees, East positive
 let bigOn = false;
+let lines = [];           // [{id,name,type:'twopt'|'wind', aId,bId | wpId,wind}]
+let activeLineId = null;
+let mode = "wp";          // "wp" | "line" — which target the Navigate screen follows
 
 let pos = null;        // {lat,lon,t,acc,rawSpeed,rawHeading}
 let prevFix = null;
@@ -591,17 +636,69 @@ function load(){
   variation = isFinite(v) ? v : 0;
   const cf = localStorage.getItem("vmg.coordfmt");
   coordFmt = ["dd","ddm","dms"].includes(cf) ? cf : "dd";
+  try{ lines = JSON.parse(localStorage.getItem("vmg.lines")) || []; }catch(e){ lines=[]; }
+  activeLineId = localStorage.getItem("vmg.activeLine") || null;
+  mode = localStorage.getItem("vmg.mode")==="line" ? "line" : "wp";
 }
 function saveWps(){ localStorage.setItem(LS.wps, JSON.stringify(waypoints)); }
 function saveActive(){ activeId ? localStorage.setItem(LS.active, activeId) : localStorage.removeItem(LS.active); }
 function saveUnits(){ localStorage.setItem(LS.units, units); }
 function saveNorth(){ localStorage.setItem(LS.north, northMode); localStorage.setItem(LS.variation, String(variation)); }
+function saveLines(){ localStorage.setItem("vmg.lines", JSON.stringify(lines)); }
+function saveActiveLine(){ activeLineId ? localStorage.setItem("vmg.activeLine", activeLineId) : localStorage.removeItem("vmg.activeLine"); }
+function saveMode(){ localStorage.setItem("vmg.mode", mode); }
 
 // apply chosen north reference to a true-north angle
 function disp(a){ a = northMode==="mag" ? a - variation : a; return ((a % 360) + 360) % 360; }
 function brgUnit(){ return northMode==="mag" ? "°M" : "°T"; }
 
+function activeLine(){ return lines.find(l => l.id === activeLineId) || null; }
+
+// resolve a line to an anchor point + great-circle bearing of the line
+function lineDef(line){
+  if(!line) return null;
+  if(line.type === "wind"){
+    const w = waypoints.find(x => x.id === line.wpId);
+    if(!w) return null;
+    return { aLat:w.lat, aLon:w.lon, brg: ((line.wind + 90) % 360 + 360) % 360 }; // perpendicular to wind
+  }
+  const a = waypoints.find(x => x.id === line.aId), b = waypoints.find(x => x.id === line.bId);
+  if(!a || !b || a.id === b.id) return null;
+  return { aLat:a.lat, aLon:a.lon, brg: bearing(a, b) };
+}
+
+// signed cross-track distance (m) and the bearing from P toward the nearest point on the line
+function lineGeometry(aLat, aLon, lineBrg, pLat, pLon){
+  const A = {lat:aLat, lon:aLon}, P = {lat:pLat, lon:pLon};
+  const d13 = haversine(A, P) / R;                            // angular distance A->P
+  const th13 = toRad(bearing(A, P));
+  const th12 = toRad(lineBrg);
+  const xtd = Math.asin(Math.max(-1, Math.min(1, Math.sin(d13) * Math.sin(th13 - th12)))) * R;
+  const perpBrg = xtd >= 0 ? ((lineBrg - 90 + 360) % 360) : ((lineBrg + 90) % 360);
+  return { xtd, perpBrg };
+}
+
 function activeWp(){ return waypoints.find(w => w.id === activeId) || null; }
+
+// the current target the Navigate screen follows (waypoint or line)
+function currentTarget(){
+  if(mode === "line"){
+    const ln = activeLine();
+    if(!ln) return null;
+    const def = lineDef(ln);
+    return { name: ln.name, isLine: true, valid: !!def, def };
+  }
+  const wp = activeWp();
+  if(!wp) return null;
+  return { name: wp.name, isLine: false, valid: true, wp };
+}
+
+// label for the active target: a contrasting icon (◆ mark / ⟂ line) plus the
+// name, stripping any icon already baked into the name so it never doubles up
+function targetLabel(t){
+  const name = (t && t.name || "").replace(/^\s*[⟂◆⊥]\s*/, "");
+  return (t && t.isLine ? "⟂ " : "◆ ") + name;
+}
 
 /* ---------------- toast ---------------- */
 let toastT;
@@ -655,15 +752,28 @@ function setCard(rot){
 
 function render(){
   const U = UNIT_SETS[units];
-  const wp = activeWp();
+  const tgt = currentTarget();
+  const haveTarget = !!(tgt && tgt.valid);
 
-  // toggle nav vs empty
-  $("navContent").style.display = wp ? "" : "none";
-  $("navEmpty").style.display = wp ? "none" : "block";
-  $("activeWpName").textContent = wp ? wp.name : "No mark selected";
-  $("activeWpName").style.color = wp ? "var(--mark)" : "var(--muted)";
+  $("navContent").style.display = haveTarget ? "" : "none";
+  $("navEmpty").style.display = haveTarget ? "none" : "block";
   $("vmgUnit").textContent = U.spName;
-  if(!wp) return;
+
+  if(!haveTarget){
+    if(mode==="line"){
+      if(!tgt){ $("navEmptyTitle").textContent="No line selected"; $("navEmptyMsg").textContent="Create a line on the Lines tab and select it."; }
+      else { $("navEmptyTitle").textContent="Line unavailable"; $("navEmptyMsg").textContent="This line’s waypoint(s) are missing — edit it on the Lines tab."; }
+      $("activeWpName").textContent = "No line selected";
+    } else {
+      $("navEmptyTitle").textContent="No mark selected"; $("navEmptyMsg").textContent="Add a waypoint and select it to start a live VMG reading.";
+      $("activeWpName").textContent = "No mark selected";
+    }
+    $("activeWpName").style.color = "var(--muted)";
+    return;
+  }
+
+  $("activeWpName").textContent = targetLabel(tgt);
+  $("activeWpName").style.color = "var(--mark)";
 
   // reference heading for the dial (course-up or compass-up), in chosen north ref
   let ref = 0;
@@ -676,25 +786,33 @@ function render(){
   const stateTag = $("stateTag");
 
   if(!pos){
-    vmgNum.textContent = "--"; vmgNum.className="vmg-num idle";
+    vmgNum.textContent = "--"; vmgNum.className="vmg-num idle"; fitDialVmg();
     stateTag.textContent=""; stateTag.className="state-tag";
     if(bigOn) updateBig("--","idle","",null,null);
     return;
   }
 
-  const dist = haversine(pos, wp);
-  const brg  = bearing(pos, wp);
+  // distance + bearing to the target: a waypoint, or the nearest point on a line
+  let dist, brg;
+  if(tgt.isLine){
+    const g = lineGeometry(tgt.def.aLat, tgt.def.aLon, tgt.def.brg, pos.lat, pos.lon);
+    dist = Math.abs(g.xtd); brg = g.perpBrg;
+  } else {
+    dist = haversine(pos, tgt.wp); brg = bearing(pos, tgt.wp);
+  }
   const relBrg = (disp(brg) - dref + 360) % 360;
   setNeedle(relBrg);
 
-  // relative angle off the bow (steer this much to point at the mark)
+  // relative angle off the bow (steer this much to point at the target)
   const relToCog = cog!=null ? (((brg - cog + 540)%360)-180) : null;
 
-  // VMG (component of speed toward the mark)
+  // VMG (component of speed toward the target — the mark, or the line)
   let v = null;
   if(cog!=null && sog>0.15){ v = sog * Math.cos(toRad(brg - cog)); }
   else if(sog<=0.15){ v = 0; }
   vmg = v==null ? 0 : v;
+
+  const noun = tgt.isLine ? "line" : "mark";
 
   // VMG readout strings (reused by both normal and big display)
   let vmgText, vmgKind, stateText;
@@ -702,12 +820,13 @@ function render(){
   else {
     const dd = Math.abs(v*U.sp); vmgText = dd.toFixed(1);
     if(sog<=0.2){ vmgKind="idle"; stateText="stationary"; }
-    else if(v>=0.05){ vmgKind="closing"; stateText="closing on mark"; }
+    else if(v>=0.05){ vmgKind="closing"; stateText="closing the "+noun; }
     else if(v<=-0.05){ vmgKind="opening"; stateText="losing ground"; }
-    else { vmgKind="idle"; stateText="across the mark"; }
+    else { vmgKind="idle"; stateText = tgt.isLine ? "on the line" : "across the mark"; }
   }
   vmgNum.textContent = vmgText;
   vmgNum.className = vmgKind==="opening" ? "vmg-num opening" : vmgKind==="idle" ? "vmg-num idle" : "vmg-num";
+  fitDialVmg();
   stateTag.textContent = stateText;
   stateTag.className = "state-tag" + (vmgKind==="closing" ? " closing" : vmgKind==="opening" ? " opening" : "");
 
@@ -730,9 +849,34 @@ function render(){
 }
 
 // update the big (across-the-cockpit) display
+function fitBigVmg(){
+  const el = $("bigVmg");
+  if(!el || !bigOn) return;
+  el.style.fontSize = "";                          // back to the CSS max
+  const parent = el.parentElement;
+  const avail = (parent ? parent.clientWidth : window.innerWidth) - 20;
+  const w = el.scrollWidth;
+  if(w > avail){
+    const cur = parseFloat(getComputedStyle(el).fontSize) || 200;
+    el.style.fontSize = Math.max(64, Math.floor(cur * avail / w)) + "px";
+  }
+}
+function fitDialVmg(){
+  const el = $("vmgNum");
+  if(!el) return;
+  el.style.fontSize = "";                          // back to the CSS max
+  const parent = el.parentElement;                 // .core (= dial size)
+  if(!parent || !parent.clientWidth) return;       // hidden view -> skip
+  const avail = parent.clientWidth * 0.84;         // keep inside the ring
+  const w = el.scrollWidth;
+  if(w > avail){
+    const cur = parseFloat(getComputedStyle(el).fontSize) || 100;
+    el.style.fontSize = Math.max(40, Math.floor(cur * avail / w)) + "px";
+  }
+}
 function updateBig(vmgText, vmgKind, stateText, distText, relText, relBrg){
-  const wp = activeWp();
-  $("bigWp").textContent = wp ? wp.name : "—";
+  const t = currentTarget();
+  $("bigWp").textContent = (t && t.valid) ? targetLabel(t) : "—";
   const bv = $("bigVmg");
   bv.textContent = vmgText;
   bv.className = "big-vmg" + (vmgKind==="opening" ? " opening" : vmgKind==="idle" ? " idle" : "");
@@ -741,6 +885,7 @@ function updateBig(vmgText, vmgKind, stateText, distText, relText, relBrg){
   $("bigDist").textContent = distText==null ? "--" : distText;
   $("bigSteer").textContent = relText==null ? "--" : relText;
   if(relBrg!=null) $("bigArrow").style.transform = `rotate(${relBrg}deg)`;
+  fitBigVmg();
 }
 
 /* ---------------- GPS ---------------- */
@@ -855,7 +1000,7 @@ function renderWpList(){
   $("wpEmpty").style.display = waypoints.length ? "none" : "block";
   waypoints.forEach(w=>{
     const li=document.createElement("li");
-    li.className="wp"+(w.id===activeId?" sel":"");
+    li.className="wp"+((mode==="wp" && w.id===activeId)?" sel":"");
     li.innerHTML = `
       <div class="wp-radio"></div>
       <div class="wp-main">
@@ -867,7 +1012,8 @@ function renderWpList(){
     li.querySelector(".wp-name").textContent = w.name;
     li.addEventListener("click", e=>{
       if(e.target.closest(".wp-del")) return;
-      activeId = w.id; saveActive(); renderWpList(); render(); switchView("nav");
+      mode="wp"; activeId = w.id; saveMode(); saveActive();
+      renderWpList(); renderLines(); render(); switchView("nav");
     });
     li.querySelector(".wp-del").addEventListener("click", e=>{
       e.stopPropagation();
@@ -880,6 +1026,8 @@ function renderWpList(){
   });
   renderWpDistances();
   populateRefWp();
+  populateLineWps();
+  renderLines();
 }
 function renderWpDistances(){
   if(!pos) return;
@@ -889,6 +1037,94 @@ function renderWpDistances(){
     const d=fmtDist(haversine(pos,w));
     el.textContent = `${d.v} ${d.u}`;
   });
+}
+
+/* ---------------- lines ---------------- */
+let lineType = "twopt";
+function wpName(id){ const w=waypoints.find(x=>x.id===id); return w ? w.name : "(missing)"; }
+function fillWpSelect(sel){
+  if(!sel) return;
+  const prev=sel.value;
+  if(!waypoints.length){ sel.innerHTML=`<option value="">— add waypoints first —</option>`; sel.value=""; return; }
+  sel.innerHTML = waypoints.map(w=>`<option value="${w.id}">${escapeHtml(w.name)}</option>`).join("");
+  sel.value = waypoints.some(w=>w.id===prev) ? prev : waypoints[0].id;
+}
+function populateLineWps(){
+  fillWpSelect($("lineA")); fillWpSelect($("lineB")); fillWpSelect($("lineWp"));
+  if($("lineA") && $("lineB") && waypoints.length>=2 && $("lineA").value===$("lineB").value){
+    const other = waypoints.find(w=>w.id!==$("lineA").value);
+    if(other) $("lineB").value = other.id;
+  }
+}
+function lineSummary(ln){
+  if(ln.type==="wind") return `⟂ wind ${Math.round(ln.wind)}° · through ${wpName(ln.wpId)}`;
+  return `${wpName(ln.aId)} → ${wpName(ln.bId)}`;
+}
+function setLineType(t){
+  lineType = t==="wind" ? "wind" : "twopt";
+  document.querySelectorAll("#segLineType button").forEach(b=> b.classList.toggle("on", b.dataset.lt===lineType));
+  document.querySelectorAll(".lt-fields").forEach(f=> f.hidden = f.dataset.ltf!==lineType);
+  updateLinePreview();
+}
+function readLineForm(){
+  if(lineType==="wind"){
+    const wpId=$("lineWp").value, wind=parseNum($("lineWind").value);
+    if(!wpId || wind==null) return null;
+    return { type:"wind", wpId, wind:((wind%360)+360)%360 };
+  }
+  const aId=$("lineA").value, bId=$("lineB").value;
+  if(!aId || !bId || aId===bId) return null;
+  return { type:"twopt", aId, bId };
+}
+function updateLinePreview(){
+  const lp=$("linePreview"); if(!lp) return;
+  const form=readLineForm();
+  if(!form){ lp.textContent = lineType==="wind" ? "Pick a waypoint and enter wind direction." : "Pick two different waypoints."; lp.classList.add("muted"); return; }
+  const def=lineDef(form);
+  if(!def){ lp.textContent="Line needs valid waypoints."; lp.classList.add("muted"); return; }
+  let txt = `Line runs ${Math.round(disp(def.brg))}° / ${Math.round(disp((def.brg+180)%360))} ${brgUnit()}`;
+  if(pos){ const g=lineGeometry(def.aLat,def.aLon,def.brg,pos.lat,pos.lon); const d=fmtDist(Math.abs(g.xtd)); txt += ` · ${d.v} ${d.u} away now`; }
+  lp.textContent=txt; lp.classList.remove("muted");
+}
+function renderLines(){
+  const ul=$("lineList"); if(!ul) return;
+  ul.innerHTML="";
+  $("linesEmpty").style.display = lines.length ? "none" : "block";
+  lines.forEach(ln=>{
+    const def=lineDef(ln);
+    const li=document.createElement("li");
+    li.className="wp"+((mode==="line" && ln.id===activeLineId)?" sel":"");
+    let distTxt="";
+    if(def && pos){ const g=lineGeometry(def.aLat,def.aLon,def.brg,pos.lat,pos.lon); const d=fmtDist(Math.abs(g.xtd)); distTxt=`${d.v} ${d.u}`; }
+    li.innerHTML = `<div class="wp-radio"></div><div class="wp-main"><div class="wp-name"></div><div class="wp-coords"></div></div><div class="wp-dist">${distTxt}</div><button class="wp-del" aria-label="Delete">×</button>`;
+    li.querySelector(".wp-name").textContent = ln.name.replace(/^\s*[⟂◆⊥]\s*/, "");
+    li.querySelector(".wp-coords").textContent = lineSummary(ln);
+    li.addEventListener("click", e=>{ if(e.target.closest(".wp-del")) return; selectLine(ln.id); });
+    li.querySelector(".wp-del").addEventListener("click", e=>{
+      e.stopPropagation();
+      lines=lines.filter(x=>x.id!==ln.id);
+      if(activeLineId===ln.id){ activeLineId=null; saveActiveLine(); }
+      saveLines(); renderLines(); render(); toast("Line deleted");
+    });
+    ul.appendChild(li);
+  });
+}
+function selectLine(id){
+  mode="line"; activeLineId=id; saveMode(); saveActiveLine();
+  renderLines(); renderWpList(); render(); switchView("nav");
+}
+function addLine(){
+  const need = lineType==="wind" ? 1 : 2;
+  if(waypoints.length < need){ toast("Add waypoints first"); return; }
+  const form=readLineForm();
+  if(!form){ toast(lineType==="wind" ? "Pick a waypoint and wind direction" : "Pick two different waypoints"); return; }
+  const name=$("lineName").value.trim();
+  const auto = form.type==="wind" ? `Wind ${Math.round(form.wind)}°` : `${wpName(form.aId)} → ${wpName(form.bId)}`;
+  const ln = Object.assign({ id:"l"+Date.now().toString(36)+(idSeq++).toString(36)+Math.random().toString(36).slice(2,4), name:name||auto }, form);
+  lines.push(ln); saveLines();
+  $("lineName").value=""; if(lineType==="wind") $("lineWind").value="";
+  renderLines(); updateLinePreview();
+  toast("Line added");
 }
 
 /* ---------------- add waypoint ---------------- */
@@ -1110,17 +1346,19 @@ function importWaypoints(file){
 function switchView(v){
   $("view-nav").classList.toggle("active", v==="nav");
   $("view-wp").classList.toggle("active", v==="wp");
+  $("view-lines").classList.toggle("active", v==="lines");
   $("view-opt").classList.toggle("active", v==="opt");
   $("tabNav").classList.toggle("active", v==="nav");
   $("tabWp").classList.toggle("active", v==="wp");
+  $("tabLines").classList.toggle("active", v==="lines");
   $("tabOpt").classList.toggle("active", v==="opt");
   if(v==="opt") renderOptions();
+  if(v==="lines"){ populateLineWps(); renderLines(); updateLinePreview(); }
   window.scrollTo(0,0);
 }
 function setUnits(u){
   if(!UNIT_SETS[u]) return;
   units=u; saveUnits();
-  $("unitsBtn").textContent = UNIT_SETS[units].spName;
   renderOptions(); render(); renderWpDistances();
 }
 function cycleUnits(){
@@ -1166,9 +1404,7 @@ async function toggleBig(on){
 /* ---------------- wire up ---------------- */
 function init(){
   load();
-  $("unitsBtn").textContent = UNIT_SETS[units].spName;
   document.querySelectorAll("nav button").forEach(b=> b.addEventListener("click", ()=>switchView(b.dataset.view)));
-  $("unitsBtn").addEventListener("click", cycleUnits);
   $("addWpBtn").addEventListener("click", addWaypoint);
   $("wakeBtn").addEventListener("click", toggleWake);
   $("orientBtn").addEventListener("click", toggleCompass);
@@ -1186,6 +1422,14 @@ function init(){
   $("lonHemBtn").addEventListener("click", ()=>toggleHem("lon"));
   document.querySelectorAll("#segFmt button").forEach(b=> b.addEventListener("click", ()=>setFmt(b.dataset.f)));
   setCoordFmtUI();
+
+  // lines
+  document.querySelectorAll("#segLineType button").forEach(b=> b.addEventListener("click", ()=>setLineType(b.dataset.lt)));
+  ["lineA","lineB","lineWp","lineWind"].forEach(id=>{ const e=$(id); if(e){ e.addEventListener("input", updateLinePreview); e.addEventListener("change", updateLinePreview); } });
+  $("addLineBtn").addEventListener("click", addLine);
+  setLineType("twopt");
+  populateLineWps();
+  renderLines();
   populateUnitSel($("offUnit"));
   populateUnitSel($("fwUnit"));
   ["offBrg","offDist","offUnit","fwBrg","fwDist","fwUnit","refWp"].forEach(id=>{
@@ -1200,6 +1444,7 @@ function init(){
   $("openBig").addEventListener("click", ()=> toggleBig(true));
   $("bigExit").addEventListener("click", (e)=>{ e.stopPropagation(); toggleBig(false); });
   $("bigDisplay").addEventListener("click", ()=> toggleBig(false));
+  window.addEventListener("resize", ()=>{ fitDialVmg(); if(bigOn) fitBigVmg(); });
   renderOptions();
 
   renderWpList();
